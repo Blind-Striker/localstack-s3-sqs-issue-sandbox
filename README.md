@@ -4,6 +4,10 @@ This application is designed to reproduce a bug reported for LocalStack with .NE
 1. Create an S3 bucket and delete it.
 2. Create an SQS queue and delete it.
 
+Related Issues:
+- https://github.com/localstack/localstack/issues/8924
+- https://github.com/localstack/localstack/issues/8928
+
 ## Prerequisites
 
 Before you can run this application, you must have .NET 7 installed. If you don't have .NET 7 installed, follow these steps:
