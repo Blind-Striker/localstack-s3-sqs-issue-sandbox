@@ -1,18 +1,15 @@
 # LocalStack.NET Bug Reproduction
 
-This application is designed to reproduce a bug reported for LocalStack with .NET 7 integration. The application provides two scenarios for the user:
-1. Create an S3 bucket and delete it.
-2. Create an SQS queue and delete it.
+This application is designed to reproduce a bug reported for LocalStack with .NET 8 integration. The application provides a scenario for the user to `Create an SNS topic and delete it`
 
-Related Issues:
+Related Issue:
 - https://github.com/localstack/localstack/issues/8924
-- https://github.com/localstack/localstack/issues/8928
 
 ## Prerequisites
 
-Before you can run this application, you must have .NET 7 installed. If you don't have .NET 7 installed, follow these steps:
+Before you can run this application, you must have .NET 8 installed. If you don't have .NET 8 installed, follow these steps:
 
-1. Download the .NET 7 SDK from [here](https://dotnet.microsoft.com/download/dotnet/7.0).
+1. Download the .NET 8 SDK from [here](https://dotnet.microsoft.com/download/dotnet/8.0).
 2. Install the SDK by following the instructions specific to your OS.
 
 ## Building the Application
@@ -53,4 +50,4 @@ Navigate to the root of the project directory in your terminal or command prompt
 dotnet run --project .\Sandbox\Sandbox.csproj
 ```
 
-Upon execution, the application will prompt you to choose a scenario (s3 or sqs). Based on your choice, it will either create an S3 bucket or an SQS queue and then delete it
+Upon execution, the application will prompt you to press any key and proceed with the scenario, then it will create an SNS topic and delete it.

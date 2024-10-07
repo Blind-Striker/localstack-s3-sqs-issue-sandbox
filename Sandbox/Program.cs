@@ -1,9 +1,5 @@
-﻿using System.Net;
-using System.Text.Json;
-using Amazon.S3;
-using Amazon.S3.Model;
-using Amazon.SQS;
-using Amazon.SQS.Model;
+﻿using Amazon.SimpleNotificationService;
+using Amazon.SimpleNotificationService.Model;
 using LocalStack.Client.Extensions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -15,124 +11,51 @@ var configuration = new ConfigurationBuilder()
     .AddEnvironmentVariables()
     .Build();
 
+// Environment.SetEnvironmentVariable("AWS_ENDPOINT_URL_SNS", "http://localhost:8080");
+
 var services = new ServiceCollection()
     .AddLocalStack(configuration)
-    .AddAWSServiceLocalStack<IAmazonS3>()
-    .AddAWSServiceLocalStack<IAmazonSQS>()
+    //.AddAWSService<IAmazonSimpleNotificationService>()
+    .AddAWSServiceLocalStack<IAmazonSimpleNotificationService>()
     .BuildServiceProvider();
 
-var s3Client = services.GetRequiredService<IAmazonS3>();
-var sqsClient = services.GetRequiredService<IAmazonSQS>();
+var snsClient = services.GetRequiredService<IAmazonSimpleNotificationService>();
 
-Write("Please enter which scenario you want to run, sqs or s3 (default: s3):");
-string scenario = ReadLine() ?? "s3";
-if (scenario != "s3" && scenario != "sqs")
+WriteLine("Press any key to start the scenario...");
+ReadLine();
+
+WriteLine("Creating a SNS topic...");
+CreateTopicResponse createTopicResponse = await CreateSnsTopicAsync("MyTopic");
+
+if (createTopicResponse.HttpStatusCode != System.Net.HttpStatusCode.OK)
 {
-    WriteLine("Invalid scenario, defaulting to s3");
-    scenario = "s3";
+    WriteLine("Failed to create the SNS topic");
+    return;
 }
 
-WriteLine("Running scenario: " + scenario);
+ListTopicsResponse listTopicsResponse = await snsClient.ListTopicsAsync();
+Topic? snsTopic = listTopicsResponse.Topics.SingleOrDefault(topic => topic.TopicArn == createTopicResponse.TopicArn);
 
+WriteLine("Deleting the SNS topic...");
+await DeleteSnsTopicAsync(snsTopic!.TopicArn);
 
-if (scenario == "s3")
+WriteLine("Scenario completed");
+return;
+
+async Task<CreateTopicResponse> CreateSnsTopicAsync(string topic)
 {
-    var bucketName = Guid.NewGuid().ToString();
-    WriteLine("Creating bucket: " + bucketName);
-    
-    PutBucketResponse putBucketResponse = await CreateS3Bucket(bucketName);
-    
-    if (putBucketResponse.HttpStatusCode != HttpStatusCode.OK)
-    {
-        WriteLine("Failed to create bucket");
-    }
-    else
-    {
-        WriteLine("Successfully created bucket");
-        WriteLine("Press any key to delete bucket");
-        ReadKey();
-        WriteLine("Deleting bucket: " + bucketName);
-        
-        DeleteBucketResponse deleteBucketResponse = await DeleteS3Bucket(bucketName);
+    var request = new CreateTopicRequest(topic);
 
-        WriteLine(deleteBucketResponse.HttpStatusCode != HttpStatusCode.NoContent
-            ? "Failed to delete bucket"
-            : "Successfully deleted bucket");
-    }
-}
-else
-{
-    var guid = Guid.NewGuid();
-    var queueName = $"{guid}.fifo";
-    var dlQueueName = $"{guid}-DLQ.fifo";
-    WriteLine("Creating queue: " + queueName);
-    
-    CreateQueueResponse createQueueResponse = await CreateFifoQueueWithRedrive(queueName, dlQueueName);
+    CreateTopicResponse response = await snsClient.CreateTopicAsync(request);
 
-    if (createQueueResponse.HttpStatusCode != HttpStatusCode.OK)
-    {
-        WriteLine("Failed to create queue");
-    }
-    else
-    {
-        WriteLine("Successfully created queue");
-        WriteLine("Press any key to delete queue");
-        ReadKey();
-        WriteLine("Deleting queue: " + queueName);
-        
-        DeleteQueueResponse deleteQueueResponse = await DeleteQueue(createQueueResponse.QueueUrl);
-
-        WriteLine(deleteQueueResponse.HttpStatusCode != HttpStatusCode.OK
-            ? "Failed to delete queue"
-            : "Successfully deleted queue");
-    }
+    return response;
 }
 
-WriteLine("Scenario completed, press any key to exit");
-ReadKey();
-
-async Task<PutBucketResponse> CreateS3Bucket(string bucketName)
+async Task<DeleteTopicResponse> DeleteSnsTopicAsync(string topic)
 {
-    var putBucketRequest = new PutBucketRequest { BucketName = bucketName, UseClientRegion = true };
+    var request = new DeleteTopicRequest(topic);
 
-    return await s3Client.PutBucketAsync(putBucketRequest);
-}
+    DeleteTopicResponse response = await snsClient.DeleteTopicAsync(request);
 
-async Task<DeleteBucketResponse> DeleteS3Bucket(string bucketName)
-{
-    var deleteBucketRequest = new DeleteBucketRequest { BucketName = bucketName, UseClientRegion = true };
-
-    return await s3Client.DeleteBucketAsync(deleteBucketRequest);
-}
-
-async Task<CreateQueueResponse> CreateFifoQueueWithRedrive(string queueName, string dlQueueName)
-{
-    var createDlqRequest = new CreateQueueRequest
-        { QueueName = dlQueueName, Attributes = new Dictionary<string, string> { { "FifoQueue", "true" }, } };
-
-    CreateQueueResponse createDlqResult = await sqsClient.CreateQueueAsync(createDlqRequest);
-
-    GetQueueAttributesResponse attributes = await sqsClient.GetQueueAttributesAsync(new GetQueueAttributesRequest
-    {
-        QueueUrl = createDlqResult.QueueUrl,
-        AttributeNames = new List<string> { "QueueArn" }
-    });
-
-    var redrivePolicy = new { maxReceiveCount = "1", deadLetterTargetArn = attributes.Attributes["QueueArn"] };
-
-    var createQueueRequest = new CreateQueueRequest
-    {
-        QueueName = queueName,
-        Attributes = new Dictionary<string, string>
-            { { "FifoQueue", "true" }, { "RedrivePolicy", JsonSerializer.Serialize(redrivePolicy) }, }
-    };
-
-    return await sqsClient.CreateQueueAsync(createQueueRequest);
-}
-
-async Task<DeleteQueueResponse> DeleteQueue(string queueUrl)
-{
-    var deleteQueueRequest = new DeleteQueueRequest(queueUrl);
-
-    return await sqsClient.DeleteQueueAsync(deleteQueueRequest);
+    return response;
 }
