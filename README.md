@@ -3,7 +3,7 @@
 This application is designed to reproduce a bug reported for LocalStack with .NET 8 integration. The application provides a scenario for the user to `Create an SNS topic and delete it`
 
 Related Issue:
-- https://github.com/localstack/localstack/issues/8924
+- [https://github.com/localstack/localstack/issues/11652](https://github.com/localstack/localstack/issues/11652)
 
 ## Prerequisites
 
